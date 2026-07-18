@@ -1,3 +1,11 @@
+import os
+from flask import Flask, request, Response
+import requests
+
+# 1. التعريف يجب أن يكون في البداية
+app = Flask(__name__)
+
+# 2. ثم الدوال
 @app.route('/stream')
 def proxy_stream():
     target_url = request.args.get('url')
@@ -7,21 +15,11 @@ def proxy_stream():
     headers = {
         'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/126.0.0.0 Safari/537.36',
         'Referer': 'https://go4score.lc/',
-        'Origin': 'https://go4score.lc/',
-        'Accept': 'text/html,application/xhtml+xml,application/xml;q=0.9,image/avif,image/webp,*/*;q=0.8',
-        'Accept-Language': 'en-US,en;q=0.5',
-        'Connection': 'keep-alive',
-        'Upgrade-Insecure-Requests': '1'
+        'Origin': 'https://go4score.lc/'
     }
     
     try:
-        # إرسال الطلب مع تعطيل التتبع التلقائي للتأكد من أننا نتحكم في المسار
         req = requests.get(target_url, headers=headers, stream=True, allow_redirects=True)
-        
-        # إذا كان الموقع لا يزال يحاول توجيهنا، سنقوم بإيقاف الطلب فوراً
-        if "google.com" in req.url:
-            return "الموقع رفض الطلب وقام بتحويلنا لجوجل. نحتاج لتعديل الهيدرز.", 403
-            
         return Response(
             req.iter_content(chunk_size=1024),
             status=req.status_code,
@@ -32,3 +30,8 @@ def proxy_stream():
         )
     except Exception as e:
         return str(e), 500
+
+# 3. التشغيل في النهاية
+if __name__ == '__main__':
+    port = int(os.environ.get("PORT", 10000))
+    app.run(host='0.0.0.0', port=port)
