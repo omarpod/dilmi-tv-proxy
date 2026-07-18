@@ -1,36 +1,38 @@
 import os
+import re
 from flask import Flask, request, Response
 import requests
-from bs4 import BeautifulSoup
 
 app = Flask(__name__)
 
-# دالة الاستخراج الذكي
-def get_stream_url_from_site(page_url):
-    headers = {'User-Agent': 'Mozilla/5.0'}
-    response = requests.get(page_url, headers=headers)
-    soup = BeautifulSoup(response.text, 'html.parser')
-    
-    # هنا نبحث عن الرابط الذي يحتوي على m3u8
-    # ملاحظة: هذا المسار يعتمد على هيكلية الموقع الذي أريتني إياه
-    scripts = soup.find_all('script')
-    for script in scripts:
-        if 'm3u8' in str(script):
-            # الكود هنا يحتاج تخصيص بناءً على موقعك، 
-            # لكن هذا هو المسار العام للمحترفين
-            return "رابط_البث_المستخرج_مؤقتاً"
+# دالة الاستخراج الذكي باستخدام التعبيرات النمطية (Regex)
+def get_stream_url_smart(page_url):
+    headers = {
+        'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/91.0.4472.124 Safari/537.36'
+    }
+    try:
+        response = requests.get(page_url, headers=headers)
+        # البحث عن النمط الذي يبدأ بـ https وينتهي بـ m3u8 مع الـ token و exp
+        # هذا النمط يستهدف مباشرة الرابط الذي أريتني إياه في الصورة
+        pattern = r'https://[\w\.\-]+\.kora-plus\.li/live/[\w\-]+\.m3u8\?token=[\w\-]+&exp=\d+'
+        match = re.search(pattern, response.text)
+        
+        if match:
+            return match.group(0)
+    except Exception:
+        return None
     return None
 
 @app.route('/stream')
 def proxy_stream():
     target_url = request.args.get('url')
     
-    # إذا لم يرسل التطبيق رابطاً، جرب استخراجه تلقائياً
+    # محاولة الاستخراج التلقائي إذا لم يرسل التطبيق رابطاً
     if not target_url:
-        target_url = get_stream_url_from_site("https://go4score.lc/?m=30750&lang=ar")
+        target_url = get_stream_url_smart("https://go4score.lc/?m=30750&lang=ar")
     
     if not target_url:
-        return "فشل في جلب الرابط، يرجى المحاولة يدوياً", 400
+        return "فشل في جلب الرابط تلقائياً، يرجى المحاولة يدوياً عبر إرسال url", 400
 
     headers = {'User-Agent': 'Mozilla/5.0'}
     try:
@@ -41,7 +43,7 @@ def proxy_stream():
             status=response.status_code
         )
     except Exception as e:
-        return f"خطأ: {str(e)}", 500
+        return f"خطأ في البروكسي: {str(e)}", 500
 
 if __name__ == '__main__':
     port = int(os.environ.get("PORT", 10000))
